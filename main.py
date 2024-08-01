@@ -1,28 +1,19 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import onnxruntime as ort
+from fastapi import FastAPI
 import numpy as np
+import joblib
+ 
+loaded_model = joblib.load('linear_regression_model.h5')
+ 
+app = FastAPI()
+ 
+@app.get("/")
+async def read_root():
+    return {"message": "Hello, World!"}
 
-app = FastAPI()  # Make sure this is named 'app'
-
-# Load the ONNX model
-ort_session = ort.InferenceSession('linear_regression_model.onnx')
-
-class PredictionInput(BaseModel):
-    soil: float
-    seed: float
-    fertilizer: float
-    sunny: float
-    rainfall: float
-    irrigation: float
-
-@app.post("/predict")
-async def predict(data: PredictionInput):
-    try:
-        custom_sample = np.array([[data.soil, data.seed, data.fertilizer, data.sunny, data.rainfall, data.irrigation]], dtype=np.float32)
-        inputs = {ort_session.get_inputs()[0].name: custom_sample}
-        predictions = ort_session.run(None, inputs)
-        predicted_yield = predictions[0].flatten()[0]
-        return {"predicted_yield": predicted_yield}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+# Define the prediction endpoint
+@app.post("/predict/")
+async def predict(features: list): 
+    custom_sample = np.array([features], dtype=np.float32)
+    predictions = loaded_model.predict(custom_sample)
+    predicted_yield = predictions[0]
+    return {"predicted_yield": f"{predicted_yield:.2f}"}
